@@ -1,0 +1,22 @@
+---
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    groups:
+      everything:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 20
