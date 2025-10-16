@@ -3,3 +3,6 @@ out.js
 *.wasm
 javy
 tests
+/javy-x86_64-linux-v1.2.0
+/javy-x86_64-linux-v1.2.0.gz
+/bin/javy
