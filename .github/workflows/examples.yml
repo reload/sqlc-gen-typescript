@@ -17,7 +17,7 @@ jobs:
     - uses: sqlc-dev/setup-sqlc@v4
       with:
         sqlc-version: '1.24.0'
-    - uses: oven-sh/setup-bun@v1
+    - uses: oven-sh/setup-bun@v2
       with:
         bun-version: latest
     - uses: shogo82148/actions-setup-mysql@v1
@@ -46,7 +46,7 @@ jobs:
     - uses: sqlc-dev/setup-sqlc@v4
       with:
         sqlc-version: '1.24.0'
-    - uses: oven-sh/setup-bun@v1
+    - uses: oven-sh/setup-bun@v2
       with:
         bun-version: latest
     - uses: sqlc-dev/action-setup-postgres@master
