@@ -1,4 +1,4 @@
-.PHONY: generate
+.PHONY: clean generate
 
 generate: examples/plugin.wasm examples/sqlc.dev.yaml
 	cd examples && sqlc -f sqlc.dev.yaml generate
