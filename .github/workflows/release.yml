@@ -28,22 +28,11 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           RELEASE_BRANCHES: main
       - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ github.TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.new_tag }}
-          release_name: Release ${{ steps.version.outputs.new_tag }}
-          draft: false
-          prerelease: false
-      - name: Upload release asset
-        id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./examples/plugin.wasm
-          asset_name: plugin.wasm
-          asset_content_type: application/wasm
+          name: Release ${{ steps.version.outputs.new_tag }}
+          files: ./examples/plugin.wasm
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
