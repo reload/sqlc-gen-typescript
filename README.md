@@ -10,8 +10,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://downloads.sqlc.dev/plugin/sqlc-gen-typescript_0.1.3.wasm
-    sha256: 287df8f6cc06377d67ad5ba02c9e0f00c585509881434d15ea8bd9fc751a9368
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
+    sha256: e9a87231ce3c27092cd219347a9942d3d1a8b22c4f2e881fa804104e31708d5c
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -69,8 +69,8 @@ cloud:
 plugins:
 - name: ts
   wasm:
-    url: https://downloads.sqlc.dev/plugin/sqlc-gen-typescript_0.1.3.wasm
-    sha256: 287df8f6cc06377d67ad5ba02c9e0f00c585509881434d15ea8bd9fc751a9368
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
+    sha256: e9a87231ce3c27092cd219347a9942d3d1a8b22c4f2e881fa804104e31708d5c
 sql:
   - engine: "postgresql"
     queries: "query.sql"
@@ -197,7 +197,7 @@ async function main() {
   // create an author
   const author = await createAuthor(client, {
     name: "Anders Hejlsberg",
-	bio: "Original author of Turbo Pascal and co-creator of TypeScript",
+    bio: "Original author of Turbo Pascal and co-creator of TypeScript",
   });
   if (author === null) {
     throw new Error("author not created");
@@ -256,8 +256,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://downloads.sqlc.dev/plugin/sqlc-gen-typescript_0.1.3.wasm
-    sha256: 287df8f6cc06377d67ad5ba02c9e0f00c585509881434d15ea8bd9fc751a9368
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
+    sha256: e9a87231ce3c27092cd219347a9942d3d1a8b22c4f2e881fa804104e31708d5c
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -277,8 +277,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://downloads.sqlc.dev/plugin/sqlc-gen-typescript_0.1.3.wasm
-    sha256: 287df8f6cc06377d67ad5ba02c9e0f00c585509881434d15ea8bd9fc751a9368
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
+    sha256: e9a87231ce3c27092cd219347a9942d3d1a8b22c4f2e881fa804104e31708d5c
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -299,8 +299,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://downloads.sqlc.dev/plugin/sqlc-gen-typescript_0.1.3.wasm
-    sha256: 287df8f6cc06377d67ad5ba02c9e0f00c585509881434d15ea8bd9fc751a9368
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
+    sha256: e9a87231ce3c27092cd219347a9942d3d1a8b22c4f2e881fa804104e31708d5c
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -320,8 +320,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://downloads.sqlc.dev/plugin/sqlc-gen-typescript_0.1.3.wasm
-    sha256: 287df8f6cc06377d67ad5ba02c9e0f00c585509881434d15ea8bd9fc751a9368
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
+    sha256: e9a87231ce3c27092cd219347a9942d3d1a8b22c4f2e881fa804104e31708d5c
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -340,7 +340,7 @@ If you want to build and test sqlc-gen-typescript locally, follow these steps:
 
 1. Clone the repository and install dependencies:
    ```
-   git clone https://github.com/sqlc-dev/sqlc-gen-typescript.git
+   git clone https://github.com/reload/sqlc-gen-typescript.git
    cd sqlc-gen-typescript
    npm install
    ```
