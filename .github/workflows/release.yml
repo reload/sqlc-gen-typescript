@@ -1,0 +1,60 @@
+---
+name: Release
+on:
+  workflow_run:
+    workflows: ["ci", "examples"]
+    branches: [main]
+    types:
+      - completed
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Build project
+        run: |
+          make examples/plugin.wasm
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.75.0
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WITH_V: true
+          DEFAULT_BUMP: patch
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_BRANCHES: main
+      - name: Create release
+        id: create_release
+        uses: actions/github-script@v8
+        if: ${{ steps.version.outputs.new_tag }}
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.new_tag }}
+        with:
+          script: |
+            try {
+              await github.rest.repos.createRelease({
+                draft: false,
+                generate_release_notes: true,
+                name: process.env.RELEASE_TAG,
+                owner: context.repo.owner,
+                prerelease: false,
+                repo: context.repo.repo,
+                tag_name: process.env.RELEASE_TAG,
+              });
+            } catch (error) {
+              core.setFailed(error.message);
+            }
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./examples/plugin.wasm
+          asset_name: plugin.wasm
+          asset_content_type: application/wasm
