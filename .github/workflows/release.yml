@@ -2,7 +2,7 @@
 name: Release
 on:
   workflow_run:
-    workflows: ["ci", "examples"]
+    workflows: ["ci"]
     branches: [main]
     types:
       - completed
@@ -29,32 +29,21 @@ jobs:
           RELEASE_BRANCHES: main
       - name: Create release
         id: create_release
-        uses: actions/github-script@v8
-        if: ${{ steps.version.outputs.new_tag }}
+        uses: actions/create-release@v1
         env:
-          RELEASE_TAG: ${{ steps.version.outputs.new_tag }}
+          GITHUB_TOKEN: ${{ github.TOKEN }}
         with:
-          script: |
-            try {
-              await github.rest.repos.createRelease({
-                draft: false,
-                generate_release_notes: true,
-                name: process.env.RELEASE_TAG,
-                owner: context.repo.owner,
-                prerelease: false,
-                repo: context.repo.repo,
-                tag_name: process.env.RELEASE_TAG,
-              });
-            } catch (error) {
-              core.setFailed(error.message);
-            }
-      - name: Upload Release Asset
+          tag_name: ${{ steps.version.outputs.new_tag }}
+          release_name: Release ${{ steps.version.outputs.new_tag }}
+          draft: false
+          prerelease: false
+      - name: Upload release asset
         id: upload-release-asset 
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./examples/plugin.wasm
           asset_name: plugin.wasm
           asset_content_type: application/wasm
