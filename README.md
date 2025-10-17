@@ -10,8 +10,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
-    sha256: 20d497e435a1427ae5de1a041ac1f26a2460d6a2156dded839533efe0fb73c09
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.7/plugin.wasm
+    sha256: ce465f2eaac1028dba04f2416d0c3e399982b600879385129afd66244e2eb86b
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -69,8 +69,8 @@ cloud:
 plugins:
 - name: ts
   wasm:
-    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
-    sha256: 20d497e435a1427ae5de1a041ac1f26a2460d6a2156dded839533efe0fb73c09
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.7/plugin.wasm
+    sha256: ce465f2eaac1028dba04f2416d0c3e399982b600879385129afd66244e2eb86b
 sql:
   - engine: "postgresql"
     queries: "query.sql"
@@ -256,8 +256,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
-    sha256: 20d497e435a1427ae5de1a041ac1f26a2460d6a2156dded839533efe0fb73c09
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.7/plugin.wasm
+    sha256: ce465f2eaac1028dba04f2416d0c3e399982b600879385129afd66244e2eb86b
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -277,8 +277,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
-    sha256: 20d497e435a1427ae5de1a041ac1f26a2460d6a2156dded839533efe0fb73c09
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.7/plugin.wasm
+    sha256: ce465f2eaac1028dba04f2416d0c3e399982b600879385129afd66244e2eb86b
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -299,8 +299,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
-    sha256: 20d497e435a1427ae5de1a041ac1f26a2460d6a2156dded839533efe0fb73c09
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.7/plugin.wasm
+    sha256: ce465f2eaac1028dba04f2416d0c3e399982b600879385129afd66244e2eb86b
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
@@ -320,8 +320,8 @@ version: '2'
 plugins:
 - name: ts
   wasm:
-    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.6/plugin.wasm
-    sha256: 20d497e435a1427ae5de1a041ac1f26a2460d6a2156dded839533efe0fb73c09
+    url: https://github.com/reload/sqlc-gen-typescript/releases/download/v0.0.7/plugin.wasm
+    sha256: ce465f2eaac1028dba04f2416d0c3e399982b600879385129afd66244e2eb86b
 sql:
 - schema: "schema.sql"
   queries: "query.sql"
