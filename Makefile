@@ -5,7 +5,7 @@ generate: examples/plugin.wasm examples/sqlc.dev.yaml
 
 # https://github.com/bytecodealliance/javy/releases/tag/v7.0.1
 examples/plugin.wasm: out.js bin/javy
-	./bin/javy build out.js -C source=omitted -o examples/plugin.wasm
+	./bin/javy build out.js --codegen source=omitted -o examples/plugin.wasm
 
 out.js: src/app.ts $(wildcard src/drivers/*.ts) src/gen/plugin/codegen_pb.ts node_modules
 	npx tsc --noEmit
