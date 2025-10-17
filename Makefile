@@ -3,9 +3,9 @@
 generate: examples/plugin.wasm examples/sqlc.dev.yaml
 	cd examples && sqlc -f sqlc.dev.yaml generate
 
-# https://github.com/bytecodealliance/javy/releases/tag/v1.2.0
+# https://github.com/bytecodealliance/javy/releases/tag/v7.0.1
 examples/plugin.wasm: out.js bin/javy
-	./bin/javy compile out.js -o examples/plugin.wasm
+	./bin/javy build out.js -o examples/plugin.wasm
 
 out.js: src/app.ts $(wildcard src/drivers/*.ts) src/gen/plugin/codegen_pb.ts node_modules
 	npx tsc --noEmit
@@ -18,12 +18,12 @@ node_modules: package.json package-lock.json
 	npm install
 
 bin/javy:
-	wget https://github.com/bytecodealliance/javy/releases/download/v1.2.0/javy-x86_64-linux-v1.2.0.gz
-	gunzip --force javy-x86_64-linux-v1.2.0.gz
-	install -Dpv javy-x86_64-linux-v1.2.0 bin/javy
+	wget https://github.com/bytecodealliance/javy/releases/download/v7.0.1/javy-x86_64-linux-v7.0.1.gz
+	gunzip --force javy-x86_64-linux-v7.0.1.gz
+	install -Dpv javy-x86_64-linux-v7.0.1 bin/javy
 
 clean:
 	$(RM) -r out.js
 	$(RM) -r examples/plugin.wasm
 	$(RM) -r node_modules
-	$(RM) -r bin/javy javy-x86_64-linux-v1.2.0 javy-x86_64-linux-v1.2.0.gz
+	$(RM) -r bin/javy javy-x86_64-linux-v7.0.1 javy-x86_64-linux-v7.0.1.gz
