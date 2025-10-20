@@ -7,7 +7,7 @@ import {
   FunctionDeclaration,
 } from "typescript";
 
-import { Parameter, Column, Query } from "../gen/plugin/codegen_pb";
+import { Column, Parameter, Query } from "../gen/plugin/codegen_pb";
 import { argName, colName } from "./utlis";
 
 function funcParamsDecl(iface: string | undefined, params: Parameter[]) {
@@ -340,7 +340,7 @@ export class Driver {
       factory.createImportDeclaration(
         undefined,
         factory.createImportClause(
-          false,
+          true,
           undefined,
           factory.createNamedImports([
             factory.createImportSpecifier(
