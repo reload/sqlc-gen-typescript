@@ -1,8 +1,8 @@
-import { SyntaxKind, NodeFlags, TypeNode, factory } from "typescript";
+import { NodeFlags, SyntaxKind, TypeNode, factory } from "typescript";
 
 // import { writeFileSync, STDIO } from "javy/fs";
 
-import { Parameter, Column, Query } from "../gen/plugin/codegen_pb";
+import { Column, Parameter, Query } from "../gen/plugin/codegen_pb";
 import { argName, colName } from "./utlis";
 
 export interface Mysql2Options {
@@ -235,14 +235,14 @@ export class Driver {
           factory.createIdentifier("mysql"),
           factory.createNamedImports([
             factory.createImportSpecifier(
-              false,
+              true,
               undefined,
               factory.createIdentifier("RowDataPacket")
             ),
             ...(hasExecLastIdCmd
               ? [
                   factory.createImportSpecifier(
-                    false,
+                    true,
                     undefined,
                     factory.createIdentifier("ResultSetHeader")
                   ),
