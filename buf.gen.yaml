@@ -1,5 +1,5 @@
 version: v1
 plugins:
-   - plugin: buf.build/bufbuild/es:v1.4.2
+   - plugin: buf.build/bufbuild/es:v2.11.0
      opt: target=ts
      out: src/gen

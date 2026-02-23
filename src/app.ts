@@ -18,12 +18,16 @@ import {
   factory,
 } from "typescript";
 
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import {
   GenerateRequest,
+  GenerateRequestSchema,
   GenerateResponse,
+  GenerateResponseSchema,
   Parameter,
   Column,
   File,
+  FileSchema,
   Query,
 } from "./gen/plugin/codegen_pb";
 
@@ -200,7 +204,7 @@ ${query.text}`
       }
       if (nodes) {
         files.push(
-          new File({
+          create(FileSchema, {
             name: `${filename.replace(".", "_")}.ts`,
             contents: new TextEncoder().encode(printNode(nodes)),
           })
@@ -209,7 +213,7 @@ ${query.text}`
     }
   }
 
-  return new GenerateResponse({
+  return create(GenerateResponseSchema, {
     files: files,
   });
 }
@@ -217,7 +221,7 @@ ${query.text}`
 // Read input from stdin
 function readInput(): GenerateRequest {
   const buffer = readFileSync(STDIO.Stdin);
-  return GenerateRequest.fromBinary(buffer);
+  return fromBinary(GenerateRequestSchema, buffer);
 }
 
 function queryDecl(name: string, sql: string) {
@@ -299,7 +303,6 @@ function printNode(nodes: Node[]): string {
 
 // Write output to stdout
 function writeOutput(output: GenerateResponse) {
-  const encodedOutput = output.toBinary();
-  const buffer = new Uint8Array(encodedOutput);
+  const buffer = toBinary(GenerateResponseSchema, output);
   writeFileSync(STDIO.Stdout, buffer);
 }
