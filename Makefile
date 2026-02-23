@@ -12,7 +12,7 @@ out.js: src/app.ts $(wildcard src/drivers/*.ts) src/gen/plugin/codegen_pb.ts nod
 	npx esbuild --bundle src/app.ts --tree-shaking=true --format=esm --target=es2020 --outfile=out.js
 
 src/gen/plugin/codegen_pb.ts: buf.gen.yaml
-	buf generate --template buf.gen.yaml buf.build/sqlc/sqlc --path plugin/
+	npx @bufbuild/buf generate --template buf.gen.yaml buf.build/sqlc/sqlc --path plugin/
 
 node_modules: package.json package-lock.json
 	npm install
