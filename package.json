@@ -13,7 +13,7 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^1.4.2",
+    "@bufbuild/protobuf": "^2.11.0",
     "javy": "^0.1.2",
     "pg": "^8.11.3"
   }
