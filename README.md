@@ -1,5 +1,16 @@
 # sqlc-gen-typescript
 
+> [!NOTE]
+>
+> This project is a fork of
+> [sqlc-dev/sqlc-gen-typescript](https://github.com/sqlc-dev/sqlc-gen-typescript).
+>
+> The original project appears unmaintained.
+>
+> We forked it to update dependencies and have added @dependabot to
+> keep them up to date going forward. We have also added some fixes we
+> needed (most of them pull requests from the original project).
+
 > [!CAUTION]
 > Here be dragons! This plugin is still in early access. Expect breaking changes, missing functionality, and sub-optimal output. Please report all issues and errors. Good luck!
 
