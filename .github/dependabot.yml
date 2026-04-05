@@ -16,3 +16,52 @@ updates:
       time: "04:00"
       timezone: Europe/Copenhagen
     open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /examples/bun-mysql2
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /examples/bun-pg
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 20
+    open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /examples/bun-postgres
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /examples/node-better-sqlite3
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /examples/node-mysql2
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /examples/node-pg
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
+    open-pull-requests-limit: 20
+  - package-ecosystem: npm
+    directory: /examples/node-postgres
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: Europe/Copenhagen
