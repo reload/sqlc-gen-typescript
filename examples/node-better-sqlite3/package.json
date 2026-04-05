@@ -13,6 +13,6 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.1"
+    "better-sqlite3": "^12.8.0"
   }
 }
