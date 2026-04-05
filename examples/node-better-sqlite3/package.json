@@ -10,7 +10,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.9",
-    "typescript": "^5.2.2"
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0"
