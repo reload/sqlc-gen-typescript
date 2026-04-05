@@ -12,7 +12,7 @@
     "mysql2": "^3.6.3"
   },
   "devDependencies": {
-    "@types/node": "^20.9.0",
+    "@types/node": "^25.5.2",
     "typescript": "^5.3.2"
   }
 }
