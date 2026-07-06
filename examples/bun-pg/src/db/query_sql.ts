@@ -30,6 +30,9 @@ export async function getAuthor(client: Client, args: GetAuthorArgs): Promise<Ge
         return null;
     }
     const row = result.rows[0];
+    if (!row) {
+        return null;
+    }
     return {
         id: row[0],
         name: row[1],
@@ -91,6 +94,9 @@ export async function createAuthor(client: Client, args: CreateAuthorArgs): Prom
         return null;
     }
     const row = result.rows[0];
+    if (!row) {
+        return null;
+    }
     return {
         id: row[0],
         name: row[1],
