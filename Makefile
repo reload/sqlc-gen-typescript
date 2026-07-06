@@ -1,7 +1,10 @@
-.PHONY: clean generate
+.PHONY: clean generate validate
 
 generate: examples/plugin.wasm examples/sqlc.dev.yaml
 	cd examples && sqlc -f sqlc.dev.yaml generate
+
+validate: node_modules
+	npm test
 
 # https://github.com/bytecodealliance/javy/releases/tag/v7.0.1
 examples/plugin.wasm: out.js bin/javy
