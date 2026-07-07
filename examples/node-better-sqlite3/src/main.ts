@@ -33,7 +33,11 @@ async function main() {
   console.log(authors);
 
   // Get that author
-  const seal = await getAuthor(database, { id: authors[0].id });
+  const author = authors[0];
+  if (!author) {
+    throw new Error("author not found");
+  }
+  const seal = await getAuthor(database, { id: author.id });
   if (seal === null) {
     throw new Error("seal not found");
   }
