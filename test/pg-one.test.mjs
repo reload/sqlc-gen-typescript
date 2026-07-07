@@ -1,27 +1,19 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "vitest";
-import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const generatedFiles = [
-  "examples/node-pg/src/db/query_sql.ts",
-  "examples/bun-pg/src/db/query_sql.ts",
-].map((path) => resolve(root, path));
-const tsc = resolve(root, "node_modules/.bin/tsc");
-
-function relativePath(path) {
-  return relative(root, path);
-}
+import {
+  assertTypeChecks,
+  pgGeneratedFiles,
+  relativePath,
+} from "../test-support/driver-test-helpers.mjs";
 
 test("generated pg :one queries guard row access", () => {
   let totalOneQueryCount = 0;
 
-  for (const generatedFile of generatedFiles) {
+  for (const generatedFile of pgGeneratedFiles) {
     assert.ok(
       existsSync(generatedFile),
       `Missing generated pg output: ${generatedFile}`
@@ -61,39 +53,5 @@ test("generated pg :one queries guard row access", () => {
 });
 
 test("generated pg output type-checks with strict noUncheckedIndexedAccess", () => {
-  assert.ok(
-    existsSync(tsc),
-    "Missing TypeScript compiler. Install project dependencies before running validation."
-  );
-
-  const result = spawnSync(
-    tsc,
-    [
-      "--ignoreConfig",
-      "--strict",
-      "--noUncheckedIndexedAccess",
-      "--module",
-      "commonjs",
-      "--target",
-      "es2020",
-      "--esModuleInterop",
-      "--skipLibCheck",
-      "--noEmit",
-      ...generatedFiles,
-    ],
-    { cwd: root, encoding: "utf8" }
-  );
-
-  assert.ifError(result.error);
-  assert.equal(
-    result.status,
-    0,
-    [
-      "Generated pg output failed strict noUncheckedIndexedAccess type-check.",
-      result.stdout,
-      result.stderr,
-    ]
-      .filter(Boolean)
-      .join("\n")
-  );
+  assertTypeChecks("Generated pg output", pgGeneratedFiles);
 });
