@@ -3,6 +3,7 @@
   "module": "src/main.ts",
   "type": "module",
   "devDependencies": {
+    "@types/pg": "^8.10.9",
     "bun-types": "latest"
   },
   "peerDependencies": {

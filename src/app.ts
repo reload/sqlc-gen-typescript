@@ -138,7 +138,7 @@ function codegen(input: GenerateRequest): GenerateResponse {
         colmap.set(column.name, count + 1);
       }
 
-      const lowerName = query.name[0].toLowerCase() + query.name.slice(1);
+      const lowerName = query.name.charAt(0).toLowerCase() + query.name.slice(1);
       const textName = `${lowerName}Query`;
 
       nodes.push(
