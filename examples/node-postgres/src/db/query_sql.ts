@@ -2,6 +2,64 @@
 
 import type { Sql, TransactionSql } from "postgres";
 
+/**
+ * Options for generated batch queries.
+ * batchSize bounds pipelined queries per reserved connection chunk; chunks run in input order.
+ */
+export interface SqlcBatchOptions {
+    batchSize?: number;
+}
+
+export interface SqlcBatchErrorItem {
+    index: number;
+    error: unknown;
+}
+
+/**
+ * Batch functions reject with this after the first failed chunk.
+ * errors contain input indexes; later chunks are not started.
+ */
+export class SqlcBatchError extends Error {
+    readonly errors: SqlcBatchErrorItem[];
+
+    constructor(errors: SqlcBatchErrorItem[]) {
+        super(`Batch failed for ${errors.length} item(s)`);
+        this.name = "SqlcBatchError";
+        this.errors = errors;
+    }
+}
+
+function sqlcBatchSize(options: SqlcBatchOptions | undefined): number {
+    const batchSize = options?.batchSize ?? 64;
+    if (!Number.isInteger(batchSize) || batchSize < 1) {
+        throw new RangeError("batchSize must be a positive integer");
+    }
+    return batchSize;
+}
+
+async function sqlcRunBatched<TArg, TResult>(args: TArg[], options: SqlcBatchOptions | undefined, run: (arg: TArg, index: number) => Promise<TResult>): Promise<TResult[]> {
+    const batchSize = sqlcBatchSize(options);
+    const results = new Array<TResult>(args.length);
+    for (let start = 0; start < args.length; start += batchSize) {
+        const chunk = args.slice(start, start + batchSize);
+        const settled = await Promise.allSettled(chunk.map((arg, offset) => run(arg, start + offset)));
+        const errors: SqlcBatchErrorItem[] = [];
+        for (const [offset, result] of settled.entries()) {
+            const index = start + offset;
+            if (result.status === "fulfilled") {
+                results[index] = result.value;
+            }
+            else {
+                errors.push({ index, error: result.reason });
+            }
+        }
+        if (errors.length > 0) {
+            throw new SqlcBatchError(errors);
+        }
+    }
+    return results;
+}
+
 export const getAuthorQuery = `-- name: GetAuthor :one
 SELECT id, name, bio FROM authors
 WHERE id = $1 LIMIT 1`;
@@ -95,5 +153,121 @@ export interface DeleteAuthorArgs {
 
 export async function deleteAuthor(sql: Sql | TransactionSql, args: DeleteAuthorArgs): Promise<void> {
     await sql.unsafe(deleteAuthorQuery, [args.id]);
+}
+
+export const batchCreateAuthorQuery = `-- name: BatchCreateAuthor :batchone
+INSERT INTO authors (
+  name, bio
+) VALUES (
+  $1, $2
+)
+RETURNING id, name, bio`;
+
+export interface BatchCreateAuthorArgs {
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchCreateAuthorRow {
+    id: string;
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchCreateAuthorBatchResult {
+    index: number;
+    row: BatchCreateAuthorRow | null;
+}
+
+export async function batchCreateAuthor(sql: Sql, args: BatchCreateAuthorArgs[], options?: SqlcBatchOptions): Promise<BatchCreateAuthorBatchResult[]> {
+    const batchSql = await sql.reserve();
+    try {
+        return await sqlcRunBatched(args, options, async (arg, index): Promise<BatchCreateAuthorBatchResult> => {
+            const rows = await batchSql.unsafe(batchCreateAuthorQuery, [arg.name, arg.bio]).values();
+            if (rows.length !== 1) {
+                return { index, row: null };
+            }
+            const row = rows[0];
+            if (!row) {
+                return { index, row: null };
+            }
+            return {
+                index,
+                row: {
+                    id: row[0],
+                    name: row[1],
+                    bio: row[2]
+                }
+            };
+        });
+    }
+    finally {
+        batchSql.release();
+    }
+}
+
+export const batchListAuthorsByBioQuery = `-- name: BatchListAuthorsByBio :batchmany
+SELECT id, name, bio FROM authors
+WHERE bio = $1
+ORDER BY name`;
+
+export interface BatchListAuthorsByBioArgs {
+    bio: string | null;
+}
+
+export interface BatchListAuthorsByBioRow {
+    id: string;
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchListAuthorsByBioBatchResult {
+    index: number;
+    rows: BatchListAuthorsByBioRow[];
+}
+
+export async function batchListAuthorsByBio(sql: Sql, args: BatchListAuthorsByBioArgs[], options?: SqlcBatchOptions): Promise<BatchListAuthorsByBioBatchResult[]> {
+    const batchSql = await sql.reserve();
+    try {
+        return await sqlcRunBatched(args, options, async (arg, index): Promise<BatchListAuthorsByBioBatchResult> => {
+            const rows = await batchSql.unsafe(batchListAuthorsByBioQuery, [arg.bio]).values();
+            return {
+                index,
+                rows: rows.map(row => ({
+                    id: row[0],
+                    name: row[1],
+                    bio: row[2]
+                }))
+            };
+        });
+    }
+    finally {
+        batchSql.release();
+    }
+}
+
+export const batchDeleteAuthorQuery = `-- name: BatchDeleteAuthor :batchexec
+DELETE FROM authors
+WHERE id = $1`;
+
+export interface BatchDeleteAuthorArgs {
+    id: string;
+}
+
+export interface BatchDeleteAuthorBatchResult {
+    index: number;
+}
+
+export async function batchDeleteAuthor(sql: Sql, args: BatchDeleteAuthorArgs[], options?: SqlcBatchOptions): Promise<BatchDeleteAuthorBatchResult[]> {
+    const batchSql = await sql.reserve();
+    try {
+        return await sqlcRunBatched(args, options, async (arg, index): Promise<BatchDeleteAuthorBatchResult> => {
+            await batchSql.unsafe(batchDeleteAuthorQuery, [arg.id]);
+            return { index };
+        });
+    }
+    finally {
+        batchSql.release();
+    }
 }
 

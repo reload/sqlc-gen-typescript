@@ -1,12 +1,16 @@
 import {
   SyntaxKind,
   NodeFlags,
+  Node,
   TypeNode,
   factory,
   FunctionDeclaration,
+  createSourceFile,
+  ScriptKind,
+  ScriptTarget,
 } from "typescript";
 
-import { Parameter, Column } from "../gen/plugin/codegen_pb";
+import { Parameter, Column, Query } from "../gen/plugin/codegen_pb";
 import { argName, colName } from "./utlis";
 import { log } from "../logger";
 
@@ -42,6 +46,110 @@ function funcParamsDecl(iface: string | undefined, params: Parameter[]) {
   }
 
   return funcParams;
+}
+
+function sourceStatements(source: string): Node[] {
+  return Array.from(
+    createSourceFile(
+      "batch.ts",
+      source,
+      ScriptTarget.Latest,
+      false,
+      ScriptKind.TS
+    ).statements
+  );
+}
+
+function batchFuncParamsDecl(argIface: string | undefined): string {
+  return `sql: Sql, args: ${(argIface ?? "void")}[], options?: SqlcBatchOptions`;
+}
+
+function batchSupportDecls(): Node[] {
+  return sourceStatements(`
+/**
+ * Options for generated batch queries.
+ * batchSize bounds pipelined queries per reserved connection chunk; chunks run in input order.
+ */
+export interface SqlcBatchOptions {
+    batchSize?: number;
+}
+
+export interface SqlcBatchErrorItem {
+    index: number;
+    error: unknown;
+}
+
+/**
+ * Batch functions reject with this after the first failed chunk.
+ * errors contain input indexes; later chunks are not started.
+ */
+export class SqlcBatchError extends Error {
+    readonly errors: SqlcBatchErrorItem[];
+
+    constructor(errors: SqlcBatchErrorItem[]) {
+        super(\`Batch failed for \${errors.length} item(s)\`);
+        this.name = "SqlcBatchError";
+        this.errors = errors;
+    }
+}
+
+function sqlcBatchSize(options: SqlcBatchOptions | undefined): number {
+    const batchSize = options?.batchSize ?? 64;
+    if (!Number.isInteger(batchSize) || batchSize < 1) {
+        throw new RangeError("batchSize must be a positive integer");
+    }
+    return batchSize;
+}
+
+async function sqlcRunBatched<TArg, TResult>(
+    args: TArg[],
+    options: SqlcBatchOptions | undefined,
+    run: (arg: TArg, index: number) => Promise<TResult>
+): Promise<TResult[]> {
+    const batchSize = sqlcBatchSize(options);
+    const results = new Array<TResult>(args.length);
+    for (let start = 0; start < args.length; start += batchSize) {
+        const chunk = args.slice(start, start + batchSize);
+        const settled = await Promise.allSettled(
+            chunk.map((arg, offset) => run(arg, start + offset))
+        );
+        const errors: SqlcBatchErrorItem[] = [];
+        for (const [offset, result] of settled.entries()) {
+            const index = start + offset;
+            if (result.status === "fulfilled") {
+                results[index] = result.value;
+            } else {
+                errors.push({ index, error: result.reason });
+            }
+        }
+        if (errors.length > 0) {
+            throw new SqlcBatchError(errors);
+        }
+    }
+    return results;
+}
+`);
+}
+
+function valuesExpression(params: Parameter[]): string {
+  if (params.length === 0) {
+    return "[]";
+  }
+  return `[${params
+    .map((param, i) => `arg.${argName(i, param.column)}`)
+    .join(", ")}]`;
+}
+
+function rowExpression(columns: Column[]): string {
+  if (columns.length === 0) {
+    return "undefined";
+  }
+  const properties = columns
+    .map((column, i) => `${colName(i, column)}: row[${i}]`)
+    .join(",\n        ");
+  return `({
+        ${properties}
+    })`;
 }
 
 export class Driver {
@@ -298,30 +406,45 @@ export class Driver {
     ]);
   }
 
-  preamble(queries: unknown) {
-    return [
+  preamble(queries: Query[]) {
+    const hasBatch = queries.some((query) => query.cmd.startsWith(":batch"));
+    const hasTransactionCompatibleQueries = queries.some((query) => !query.cmd.startsWith(":batch"));
+    const importSpecifiers = [
+      factory.createImportSpecifier(
+        false,
+        undefined,
+        factory.createIdentifier("Sql")
+      ),
+    ];
+
+    if (hasTransactionCompatibleQueries) {
+      importSpecifiers.push(
+        factory.createImportSpecifier(
+          false,
+          undefined,
+          factory.createIdentifier("TransactionSql")
+        )
+      );
+    }
+
+    const imports: Node[] = [
       factory.createImportDeclaration(
         undefined,
         factory.createImportClause(
           true,
           undefined,
-          factory.createNamedImports([
-            factory.createImportSpecifier(
-              false,
-              undefined,
-              factory.createIdentifier("Sql")
-            ),
-            factory.createImportSpecifier(
-              false,
-              undefined,
-              factory.createIdentifier("TransactionSql")
-            ),
-          ])
+          factory.createNamedImports(importSpecifiers)
         ),
         factory.createStringLiteral("postgres"),
         undefined
       ),
     ];
+
+    if (hasBatch) {
+      imports.push(...batchSupportDecls());
+    }
+
+    return imports;
   }
 
   execDecl(
@@ -614,6 +737,103 @@ export class Driver {
         true
       )
     );
+  }
+
+  batchexecDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    resultIface: string,
+    params: Parameter[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    const batchSql = await sql.reserve();
+    try {
+        return await sqlcRunBatched(args, options, async (arg, index): Promise<${resultIface}> => {
+            await batchSql.unsafe(${queryName}, ${valuesExpression(params)});
+            return { index };
+        });
+    } finally {
+        batchSql.release();
+    }
+}
+`);
+  }
+
+  batchmanyDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+    rows: ${returnIface}[];
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    const batchSql = await sql.reserve();
+    try {
+        return await sqlcRunBatched(args, options, async (arg, index): Promise<${resultIface}> => {
+            const rows = await batchSql.unsafe(${queryName}, ${valuesExpression(params)}).values();
+            return {
+                index,
+                rows: rows.map(row => ${rowExpression(columns)})
+            };
+        });
+    } finally {
+        batchSql.release();
+    }
+}
+`);
+  }
+
+  batchoneDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+    row: ${returnIface} | null;
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    const batchSql = await sql.reserve();
+    try {
+        return await sqlcRunBatched(args, options, async (arg, index): Promise<${resultIface}> => {
+            const rows = await batchSql.unsafe(${queryName}, ${valuesExpression(params)}).values();
+            if (rows.length !== 1) {
+                return { index, row: null };
+            }
+            const row = rows[0];
+            if (!row) {
+                return { index, row: null };
+            }
+            return {
+                index,
+                row: ${rowExpression(columns)}
+            };
+        });
+    } finally {
+        batchSql.release();
+    }
+}
+`);
   }
 
   execlastidDecl(

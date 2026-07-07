@@ -6,6 +6,28 @@ interface Client {
     query: (config: QueryArrayConfig) => Promise<QueryArrayResult>;
 }
 
+/**
+ * Accepted by pg batch stubs for source compatibility only.
+ * node-postgres batch annotations always throw SqlcBatchUnsupportedError.
+ */
+export interface SqlcBatchOptions {
+    batchSize?: number;
+}
+
+/**
+ * node-postgres does not expose pgx-style SendBatch/pipelining semantics.
+ * Use the postgres driver for generated batch query support.
+ */
+export class SqlcBatchUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(`pg driver does not support ${command}; use the postgres driver for batch annotations.`);
+        this.name = "SqlcBatchUnsupportedError";
+        this.command = command;
+    }
+}
 export const getAuthorQuery = `-- name: GetAuthor :one
 SELECT id, name, bio FROM authors
 WHERE id = $1 LIMIT 1`;
@@ -118,5 +140,73 @@ export async function deleteAuthor(client: Client, args: DeleteAuthorArgs): Prom
         values: [args.id],
         rowMode: "array"
     });
+}
+
+export const batchCreateAuthorQuery = `-- name: BatchCreateAuthor :batchone
+INSERT INTO authors (
+  name, bio
+) VALUES (
+  $1, $2
+)
+RETURNING id, name, bio`;
+
+export interface BatchCreateAuthorArgs {
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchCreateAuthorRow {
+    id: string;
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchCreateAuthorBatchResult {
+    index: number;
+    row: BatchCreateAuthorRow | null;
+}
+
+export async function batchCreateAuthor(_client: Client, _args: BatchCreateAuthorArgs[], _options?: SqlcBatchOptions): Promise<BatchCreateAuthorBatchResult[]> {
+    throw new SqlcBatchUnsupportedError(":batchone");
+}
+
+export const batchListAuthorsByBioQuery = `-- name: BatchListAuthorsByBio :batchmany
+SELECT id, name, bio FROM authors
+WHERE bio = $1
+ORDER BY name`;
+
+export interface BatchListAuthorsByBioArgs {
+    bio: string | null;
+}
+
+export interface BatchListAuthorsByBioRow {
+    id: string;
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchListAuthorsByBioBatchResult {
+    index: number;
+    rows: BatchListAuthorsByBioRow[];
+}
+
+export async function batchListAuthorsByBio(_client: Client, _args: BatchListAuthorsByBioArgs[], _options?: SqlcBatchOptions): Promise<BatchListAuthorsByBioBatchResult[]> {
+    throw new SqlcBatchUnsupportedError(":batchmany");
+}
+
+export const batchDeleteAuthorQuery = `-- name: BatchDeleteAuthor :batchexec
+DELETE FROM authors
+WHERE id = $1`;
+
+export interface BatchDeleteAuthorArgs {
+    id: string;
+}
+
+export interface BatchDeleteAuthorBatchResult {
+    index: number;
+}
+
+export async function batchDeleteAuthor(_client: Client, _args: BatchDeleteAuthorArgs[], _options?: SqlcBatchOptions): Promise<BatchDeleteAuthorBatchResult[]> {
+    throw new SqlcBatchUnsupportedError(":batchexec");
 }
 

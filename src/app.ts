@@ -79,6 +79,31 @@ interface Driver {
     params: Parameter[],
     columns: Column[]
   ) => Node;
+  batchexecDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    resultIface: string,
+    params: Parameter[]
+  ) => Node[];
+  batchmanyDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ) => Node[];
+  batchoneDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ) => Node[];
 }
 
 function createNodeGenerator(options: Options): Driver {
@@ -193,6 +218,46 @@ ${query.text}`
               textName,
               argIface,
               returnIface ?? "void",
+              query.params,
+              query.columns
+            )
+          );
+          break;
+        }
+        case ":batchexec": {
+          nodes.push(
+            ...driver.batchexecDecl(
+              lowerName,
+              textName,
+              argIface,
+              `${query.name}BatchResult`,
+              query.params
+            )
+          );
+          break;
+        }
+        case ":batchmany": {
+          nodes.push(
+            ...driver.batchmanyDecl(
+              lowerName,
+              textName,
+              argIface,
+              returnIface ?? "void",
+              `${query.name}BatchResult`,
+              query.params,
+              query.columns
+            )
+          );
+          break;
+        }
+        case ":batchone": {
+          nodes.push(
+            ...driver.batchoneDecl(
+              lowerName,
+              textName,
+              argIface,
+              returnIface ?? "void",
+              `${query.name}BatchResult`,
               query.params,
               query.columns
             )

@@ -5,6 +5,9 @@ import {
   TypeNode,
   factory,
   FunctionDeclaration,
+  createSourceFile,
+  ScriptKind,
+  ScriptTarget,
 } from "typescript";
 
 import { Column, Parameter, Query } from "../gen/plugin/codegen_pb";
@@ -42,6 +45,49 @@ function funcParamsDecl(iface: string | undefined, params: Parameter[]) {
   }
 
   return funcParams;
+}
+
+function sourceStatements(source: string): Node[] {
+  return Array.from(
+    createSourceFile(
+      "batch.ts",
+      source,
+      ScriptTarget.Latest,
+      false,
+      ScriptKind.TS
+    ).statements
+  );
+}
+
+function batchFuncParamsDecl(argIface: string | undefined): string {
+  return `_client: Client, _args: ${(argIface ?? "void")}[], _options?: SqlcBatchOptions`;
+}
+
+function batchUnsupportedDecls(): Node[] {
+  return sourceStatements(`
+/**
+ * Accepted by pg batch stubs for source compatibility only.
+ * node-postgres batch annotations always throw SqlcBatchUnsupportedError.
+ */
+export interface SqlcBatchOptions {
+    batchSize?: number;
+}
+
+/**
+ * node-postgres does not expose pgx-style SendBatch/pipelining semantics.
+ * Use the postgres driver for generated batch query support.
+ */
+export class SqlcBatchUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(\`pg driver does not support \${command}; use the postgres driver for batch annotations.\`);
+        this.name = "SqlcBatchUnsupportedError";
+        this.command = command;
+    }
+}
+`);
 }
 
 export class Driver {
@@ -428,6 +474,10 @@ export class Driver {
       )
     );
 
+    if (queries.some((query) => query.cmd.startsWith(":batch"))) {
+      imports.push(...batchUnsupportedDecls());
+    }
+
     return imports;
   }
 
@@ -795,6 +845,66 @@ export class Driver {
         true
       )
     );
+  }
+
+  batchexecDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    resultIface: string,
+    params: Parameter[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    throw new SqlcBatchUnsupportedError(":batchexec");
+}
+`);
+  }
+
+  batchmanyDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+    rows: ${returnIface}[];
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    throw new SqlcBatchUnsupportedError(":batchmany");
+}
+`);
+  }
+
+  batchoneDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+    row: ${returnIface} | null;
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    throw new SqlcBatchUnsupportedError(":batchone");
+}
+`);
   }
 
   execlastidDecl(
