@@ -27,6 +27,7 @@ import {
   File,
   FileSchema,
   Query,
+  Identifier,
 } from "./gen/plugin/codegen_pb";
 
 import { argName, colName } from "./drivers/utlis";
@@ -34,6 +35,7 @@ import { Driver as Sqlite3Driver } from "./drivers/better-sqlite3";
 import { Driver as PgDriver } from "./drivers/pg";
 import { Driver as PostgresDriver } from "./drivers/postgres";
 import { Mysql2Options, Driver as MysqlDriver } from "./drivers/mysql2";
+import { validateCopyfromQuery } from "./copyfrom-validation";
 
 // Read input from stdin
 const input = readInput();
@@ -103,6 +105,13 @@ interface Driver {
     resultIface: string,
     params: Parameter[],
     columns: Column[]
+  ) => Node[];
+  copyfromDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    params: Parameter[],
+    table: Identifier | undefined
   ) => Node[];
 }
 
@@ -260,6 +269,19 @@ ${query.text}`
               `${query.name}BatchResult`,
               query.params,
               query.columns
+            )
+          );
+          break;
+        }
+        case ":copyfrom": {
+          validateCopyfromQuery(query);
+          nodes.push(
+            ...driver.copyfromDecl(
+              lowerName,
+              textName,
+              argIface,
+              query.params,
+              query.insertIntoTable
             )
           );
           break;

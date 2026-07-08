@@ -28,6 +28,21 @@ export class SqlcBatchUnsupportedError extends Error {
         this.command = command;
     }
 }
+
+/**
+ * node-postgres needs external COPY stream wiring that this generator does not emit.
+ * Use the postgres driver for generated :copyfrom support.
+ */
+export class SqlcCopyFromUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(`pg driver does not support ${command}; use the postgres driver for :copyfrom annotations.`);
+        this.name = "SqlcCopyFromUnsupportedError";
+        this.command = command;
+    }
+}
 export const getAuthorQuery = `-- name: GetAuthor :one
 SELECT id, name, bio FROM authors
 WHERE id = $1 LIMIT 1`;
@@ -124,6 +139,22 @@ export async function createAuthor(client: Client, args: CreateAuthorArgs): Prom
         name: row[1],
         bio: row[2]
     };
+}
+
+export const copyAuthorsQuery = `-- name: CopyAuthors :copyfrom
+INSERT INTO authors (
+  name, bio
+) VALUES (
+  $1, $2
+)`;
+
+export interface CopyAuthorsArgs {
+    name: string;
+    bio: string | null;
+}
+
+export async function copyAuthors(_client: Client, _args: CopyAuthorsArgs[]): Promise<number> {
+    throw new SqlcCopyFromUnsupportedError(":copyfrom");
 }
 
 export const deleteAuthorQuery = `-- name: DeleteAuthor :exec

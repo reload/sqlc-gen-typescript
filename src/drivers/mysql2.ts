@@ -692,6 +692,15 @@ export class Driver {
     throw new Error("mysql2 driver currently does not support :batchone");
   }
 
+  copyfromDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    params: Parameter[]
+  ): Node[] {
+    throw new Error("mysql2 driver currently does not support :copyfrom");
+  }
+
   execlastidDecl(
     funcName: string,
     queryName: string,

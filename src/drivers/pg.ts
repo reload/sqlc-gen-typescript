@@ -63,6 +63,10 @@ function batchFuncParamsDecl(argIface: string | undefined): string {
   return `_client: Client, _args: ${(argIface ?? "void")}[], _options?: SqlcBatchOptions`;
 }
 
+function copyfromFuncParamsDecl(argIface: string | undefined): string {
+  return `_client: Client, _args: ${(argIface ?? "void")}[]`;
+}
+
 function batchUnsupportedDecls(): Node[] {
   return sourceStatements(`
 /**
@@ -84,6 +88,25 @@ export class SqlcBatchUnsupportedError extends Error {
     constructor(command: string) {
         super(\`pg driver does not support \${command}; use the postgres driver for batch annotations.\`);
         this.name = "SqlcBatchUnsupportedError";
+        this.command = command;
+    }
+}
+`);
+}
+
+function copyfromUnsupportedDecls(): Node[] {
+  return sourceStatements(`
+/**
+ * node-postgres needs external COPY stream wiring that this generator does not emit.
+ * Use the postgres driver for generated :copyfrom support.
+ */
+export class SqlcCopyFromUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(\`pg driver does not support \${command}; use the postgres driver for :copyfrom annotations.\`);
+        this.name = "SqlcCopyFromUnsupportedError";
         this.command = command;
     }
 }
@@ -476,6 +499,10 @@ export class Driver {
 
     if (queries.some((query) => query.cmd.startsWith(":batch"))) {
       imports.push(...batchUnsupportedDecls());
+    }
+
+    if (queries.some((query) => query.cmd === ":copyfrom")) {
+      imports.push(...copyfromUnsupportedDecls());
     }
 
     return imports;
@@ -903,6 +930,19 @@ export interface ${resultIface} {
 
 export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
     throw new SqlcBatchUnsupportedError(":batchone");
+}
+`);
+  }
+
+  copyfromDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    params: Parameter[]
+  ): Node[] {
+    return sourceStatements(`
+export async function ${funcName}(${copyfromFuncParamsDecl(argIface)}): Promise<number> {
+    throw new SqlcCopyFromUnsupportedError(":copyfrom");
 }
 `);
   }

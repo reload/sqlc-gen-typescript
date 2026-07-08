@@ -10,7 +10,7 @@ import {
   ScriptTarget,
 } from "typescript";
 
-import { Parameter, Column, Query } from "../gen/plugin/codegen_pb";
+import { Parameter, Column, Query, Identifier } from "../gen/plugin/codegen_pb";
 import { argName, colName } from "./utlis";
 import { log } from "../logger";
 
@@ -150,6 +150,369 @@ function rowExpression(columns: Column[]): string {
   return `({
         ${properties}
     })`;
+}
+
+function copyfromSupportDecls(): Node[] {
+  return sourceStatements(String.raw`
+type SqlcCopyFromEvent = "error" | "finish" | "close" | "drain";
+type SqlcCopyFromListener = (error?: unknown) => void;
+type SqlcCopyFromEncoder = (value: unknown) => string;
+
+const sqlcCopyFromMaxChunkBytes = 65536;
+
+interface SqlcCopyFromWritable {
+    write(chunk: string, callback: (error?: Error | null) => void): boolean;
+    end(callback: (error?: Error | null) => void): void;
+    destroy?(error?: unknown): void;
+    readonly writableFinished?: boolean;
+    once?(event: SqlcCopyFromEvent, listener: SqlcCopyFromListener): SqlcCopyFromWritable;
+    off?(event: SqlcCopyFromEvent, listener: SqlcCopyFromListener): SqlcCopyFromWritable;
+    removeListener?(event: SqlcCopyFromEvent, listener: SqlcCopyFromListener): SqlcCopyFromWritable;
+}
+
+interface SqlcCopyFromQueuedWrite {
+    canContinue: boolean;
+    complete: Promise<void>;
+    failed: Promise<void>;
+}
+
+interface SqlcCopyFromState {
+    error?: Error;
+    pendingWrites: Promise<void>[];
+}
+
+function sqlcCopyFromCreateState(): SqlcCopyFromState {
+    return { pendingWrites: [] };
+}
+
+function sqlcCopyFromError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error ?? "COPY stream failed"));
+}
+
+function sqlcCopyFromRecordError(state: SqlcCopyFromState, error: unknown): void {
+    state.error ??= sqlcCopyFromError(error);
+}
+
+function sqlcCopyFromThrowIfError(state: SqlcCopyFromState): void {
+    if (state.error) {
+        throw state.error;
+    }
+}
+
+function sqlcCopyFromUnsupportedValue(value: unknown, expected = "null, string, number, boolean, bigint, Date, Uint8Array/Buffer, JSON-serializable values, and arrays for PostgreSQL array columns"): TypeError {
+    const tag = Object.prototype.toString.call(value);
+    return new TypeError(":copyfrom supports only " + expected + "; received " + tag);
+}
+
+function sqlcCopyFromScalar(value: unknown): string {
+    switch (typeof value) {
+        case "string":
+            return value;
+        case "number":
+            return String(value);
+        case "boolean":
+            return value ? "true" : "false";
+        case "bigint":
+            return value.toString();
+        case "object":
+            if (value instanceof Date) {
+                return value.toISOString();
+            }
+            throw sqlcCopyFromUnsupportedValue(value, "string, number, boolean, bigint, and Date values for scalar columns");
+        default:
+            throw sqlcCopyFromUnsupportedValue(value, "string, number, boolean, bigint, and Date values for scalar columns");
+    }
+}
+
+function sqlcCopyFromBytea(value: unknown): string {
+    let bytes: Uint8Array | undefined;
+    if (typeof ArrayBuffer !== "undefined") {
+        if (ArrayBuffer.isView(value)) {
+            const view = value as ArrayBufferView;
+            bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+        } else if (value instanceof ArrayBuffer || Object.prototype.toString.call(value) === "[object ArrayBuffer]") {
+            bytes = new Uint8Array(value as ArrayBuffer);
+        }
+    }
+    if (!bytes) {
+        throw sqlcCopyFromUnsupportedValue(value, "Uint8Array or Buffer values for bytea columns");
+    }
+
+    let hex = "";
+    for (let index = 0; index < bytes.length; index++) {
+        const byte = bytes[index];
+        if (byte === undefined) {
+            continue;
+        }
+        hex += byte.toString(16).padStart(2, "0");
+    }
+    return "\\x" + hex;
+}
+
+function sqlcCopyFromJson(value: unknown): string {
+    let text: string | undefined;
+    try {
+        text = JSON.stringify(value);
+    } catch {
+        throw sqlcCopyFromUnsupportedValue(value, "JSON-serializable values for json/jsonb columns");
+    }
+    if (text === undefined) {
+        throw sqlcCopyFromUnsupportedValue(value, "JSON-serializable values for json/jsonb columns");
+    }
+    return text;
+}
+
+function sqlcCopyFromArrayEncoder(elementEncoder: SqlcCopyFromEncoder, dimensions: number): SqlcCopyFromEncoder {
+    return (value: unknown) => sqlcCopyFromArray(value, elementEncoder, dimensions);
+}
+
+function sqlcCopyFromArray(value: unknown, elementEncoder: SqlcCopyFromEncoder, dimensions: number): string {
+    if (!Array.isArray(value)) {
+        throw sqlcCopyFromUnsupportedValue(value, "arrays for PostgreSQL array columns");
+    }
+    const nestedDimensions = dimensions - 1;
+    return "{" + value.map((element) => {
+        if (element === null || element === undefined) {
+            return "NULL";
+        }
+        if (nestedDimensions > 0) {
+            return sqlcCopyFromArray(element, elementEncoder, nestedDimensions);
+        }
+        return sqlcCopyFromArrayElement(elementEncoder(element));
+    }).join(",") + "}";
+}
+
+function sqlcCopyFromArrayElement(value: string): string {
+    return '"' + value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + '"';
+}
+
+function sqlcCopyFromValue(value: unknown, encoder: SqlcCopyFromEncoder): string {
+    if (value === null || value === undefined) {
+        return "\\N";
+    }
+    return encoder(value)
+        .replace(/\\/g, "\\\\")
+        .replace(/\t/g, "\\t")
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r");
+}
+
+function sqlcCopyFromRow(values: unknown[], encoders: SqlcCopyFromEncoder[]): string {
+    if (values.length !== encoders.length) {
+        throw new Error(":copyfrom row has " + values.length + " values, expected " + encoders.length);
+    }
+    return values.map((value, index) => {
+        const encoder = encoders[index];
+        if (!encoder) {
+            throw new Error(":copyfrom row is missing encoder for column " + index);
+        }
+        return sqlcCopyFromValue(value, encoder);
+    }).join("\t") + "\n";
+}
+
+function sqlcCopyFromQueueWrite(stream: SqlcCopyFromWritable, state: SqlcCopyFromState, chunk: string): SqlcCopyFromQueuedWrite {
+    let canContinue = true;
+    let notifyFailed!: () => void;
+    const failed = new Promise<void>((resolve) => {
+        notifyFailed = resolve;
+    });
+    const complete = new Promise<void>((resolve) => {
+        const finish = (error?: unknown) => {
+            if (error) {
+                sqlcCopyFromRecordError(state, error);
+                notifyFailed();
+            }
+            resolve();
+        };
+        try {
+            canContinue = stream.write(chunk, (error?: Error | null) => finish(error ?? undefined)) !== false;
+        } catch (error) {
+            canContinue = false;
+            finish(error);
+        }
+    });
+    state.pendingWrites.push(complete);
+    return { canContinue, complete, failed };
+}
+
+async function sqlcCopyFromWrite(stream: SqlcCopyFromWritable, state: SqlcCopyFromState, chunk: string): Promise<void> {
+    if (chunk.length === 0) {
+        return;
+    }
+    sqlcCopyFromThrowIfError(state);
+    const queuedWrite = sqlcCopyFromQueueWrite(stream, state, chunk);
+    sqlcCopyFromThrowIfError(state);
+    if (!queuedWrite.canContinue) {
+        await sqlcCopyFromDrain(stream, state, queuedWrite);
+    }
+    sqlcCopyFromThrowIfError(state);
+}
+
+async function sqlcCopyFromDrain(stream: SqlcCopyFromWritable, state: SqlcCopyFromState, queuedWrite: SqlcCopyFromQueuedWrite): Promise<void> {
+    if (typeof stream.once !== "function") {
+        await queuedWrite.complete;
+        sqlcCopyFromThrowIfError(state);
+        return;
+    }
+    await Promise.race([
+        queuedWrite.failed.then(() => sqlcCopyFromThrowIfError(state)),
+        new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const cleanup = () => {
+            stream.off?.("drain", onDrain) ?? stream.removeListener?.("drain", onDrain);
+            stream.off?.("error", onError) ?? stream.removeListener?.("error", onError);
+            stream.off?.("close", onClose) ?? stream.removeListener?.("close", onClose);
+        };
+        const settle = (complete: () => void) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            complete();
+        };
+        const onDrain = () => settle(() => resolve());
+        const onError = (error?: unknown) => settle(() => {
+            sqlcCopyFromRecordError(state, error);
+            reject(state.error);
+        });
+        const onClose = () => {
+            if (stream.writableFinished === true) {
+                onDrain();
+                return;
+            }
+            onError(new Error("COPY stream closed before drain"));
+        };
+        stream.once?.("drain", onDrain);
+        stream.once?.("error", onError);
+        stream.once?.("close", onClose);
+        }),
+    ]);
+    sqlcCopyFromThrowIfError(state);
+}
+
+async function sqlcCopyFromFlushWrites(state: SqlcCopyFromState): Promise<void> {
+    while (state.pendingWrites.length > 0) {
+        const pendingWrites = state.pendingWrites;
+        state.pendingWrites = [];
+        await Promise.all(pendingWrites);
+    }
+    sqlcCopyFromThrowIfError(state);
+}
+
+async function sqlcCopyFromEnd(stream: SqlcCopyFromWritable): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const hasCompletionEvents = typeof stream.once === "function";
+        const cleanup = () => {
+            stream.off?.("error", onError) ?? stream.removeListener?.("error", onError);
+            stream.off?.("finish", onFinish) ?? stream.removeListener?.("finish", onFinish);
+            stream.off?.("close", onClose) ?? stream.removeListener?.("close", onClose);
+        };
+        const settle = (complete: () => void) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            cleanup();
+            complete();
+        };
+        const onError = (error?: unknown) => settle(() => reject(sqlcCopyFromError(error)));
+        const onFinish = () => settle(() => resolve());
+        const onClose = () => {
+            if (stream.writableFinished === true) {
+                onFinish();
+                return;
+            }
+            onError(new Error("COPY stream closed before finish"));
+        };
+
+        if (hasCompletionEvents) {
+            stream.once?.("error", onError);
+            stream.once?.("finish", onFinish);
+            stream.once?.("close", onClose);
+        }
+
+        stream.end((error?: Error | null) => {
+            if (error) {
+                onError(error);
+                return;
+            }
+            if (!hasCompletionEvents || stream.writableFinished !== false) {
+                onFinish();
+            }
+        });
+    });
+}
+`);
+}
+
+function copyfromIdent(name: string): string {
+  return `"${name.replace(/"/g, `""`)}"`;
+}
+
+function copyfromTableName(table: Identifier | undefined): string {
+  if (!table?.name) {
+    throw new Error(":copyfrom requires an INSERT INTO table");
+  }
+  const parts = [table.schema, table.name].filter((part) => part.length > 0);
+  return parts.map(copyfromIdent).join(".");
+}
+
+function copyfromColumnName(param: Parameter, index: number): string {
+  return param.column?.originalName || param.column?.name || argName(index, param.column);
+}
+
+function copyfromSql(table: Identifier | undefined, params: Parameter[]): string {
+  const columnNames = params.map(copyfromColumnName).map(copyfromIdent).join(", ");
+  return `COPY ${copyfromTableName(table)} (${columnNames}) FROM STDIN`;
+}
+
+function copyfromColumnTypeName(column: Column | undefined): string {
+  let typeName = column?.type?.name ?? "";
+  const pgCatalog = "pg_catalog.";
+  if (typeName.startsWith(pgCatalog)) {
+    typeName = typeName.slice(pgCatalog.length);
+  }
+  if (typeName.startsWith("_")) {
+    typeName = typeName.slice(1);
+  }
+  return typeName;
+}
+
+function copyfromArrayDimensions(column: Column | undefined): number {
+  if (!column?.isArray && !column?.arrayDims) {
+    return 0;
+  }
+  return Math.max(column.arrayDims || 1, 1);
+}
+
+function copyfromScalarEncoderExpression(column: Column | undefined): string {
+  switch (copyfromColumnTypeName(column)) {
+    case "bytea":
+      return "sqlcCopyFromBytea";
+    case "json":
+    case "jsonb":
+      return "sqlcCopyFromJson";
+    default:
+      return "sqlcCopyFromScalar";
+  }
+}
+
+function copyfromEncoderExpression(param: Parameter): string {
+  const scalarEncoder = copyfromScalarEncoderExpression(param.column);
+  const dimensions = copyfromArrayDimensions(param.column);
+  if (dimensions === 0) {
+    return scalarEncoder;
+  }
+  return `sqlcCopyFromArrayEncoder(${scalarEncoder}, ${dimensions})`;
+}
+
+function copyfromEncodersExpression(params: Parameter[]): string {
+  if (params.length === 0) {
+    return "[]";
+  }
+  return `[${params.map(copyfromEncoderExpression).join(", ")}]`;
 }
 
 export class Driver {
@@ -439,6 +802,10 @@ export class Driver {
         undefined
       ),
     ];
+
+    if (queries.some((query) => query.cmd === ":copyfrom")) {
+      imports.push(...copyfromSupportDecls());
+    }
 
     if (hasBatch) {
       imports.push(...batchSupportDecls());
@@ -831,6 +1198,48 @@ export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${r
         });
     } finally {
         batchSql.release();
+    }
+}
+`);
+  }
+
+  copyfromDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    params: Parameter[],
+    table: Identifier | undefined
+  ): Node[] {
+    return sourceStatements(`
+export async function ${funcName}(sql: Sql | TransactionSql, args: ${(argIface ?? "void")}[]): Promise<number> {
+    const copyStream = await sql.unsafe(${JSON.stringify(copyfromSql(table, params))}).writable() as SqlcCopyFromWritable;
+    const copyStreamState = sqlcCopyFromCreateState();
+    const copyEncoders: SqlcCopyFromEncoder[] = ${copyfromEncodersExpression(params)};
+    const onCopyStreamError = (error?: unknown) => {
+        sqlcCopyFromRecordError(copyStreamState, error);
+    };
+    copyStream.once?.("error", onCopyStreamError);
+    try {
+        let copyRowBatch = "";
+        for (const arg of args) {
+            sqlcCopyFromThrowIfError(copyStreamState);
+            const copyRow = sqlcCopyFromRow(${valuesExpression(params)}, copyEncoders);
+            if (copyRowBatch.length > 0 && copyRowBatch.length + copyRow.length > sqlcCopyFromMaxChunkBytes) {
+                await sqlcCopyFromWrite(copyStream, copyStreamState, copyRowBatch);
+                copyRowBatch = "";
+            }
+            copyRowBatch += copyRow;
+        }
+        await sqlcCopyFromWrite(copyStream, copyStreamState, copyRowBatch);
+        await sqlcCopyFromFlushWrites(copyStreamState);
+        await sqlcCopyFromEnd(copyStream);
+        sqlcCopyFromThrowIfError(copyStreamState);
+        return args.length;
+    } catch (error) {
+        copyStream.destroy?.(error);
+        throw error;
+    } finally {
+        copyStream.off?.("error", onCopyStreamError) ?? copyStream.removeListener?.("error", onCopyStreamError);
     }
 }
 `);
