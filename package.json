@@ -4,7 +4,9 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "tsc --noEmit && vitest run test/*.test.mjs"
+    "test": "tsc --noEmit && vitest run test/*.test.mjs",
+    "test:integration": "vitest run test/integration",
+    "test:perf": "SQLC_PERF=1 vitest run --reporter=verbose test/perf"
   },
   "author": "",
   "license": "ISC",
