@@ -1,19 +1,82 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { Script, createContext } from "node:vm";
+import ts from "typescript";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const pgGeneratedFiles = [
   "examples/node-pg/src/db/query_sql.ts",
   "examples/bun-pg/src/db/query_sql.ts",
 ].map((path) => resolve(root, path));
+export const postgresGeneratedFiles = [
+  "examples/node-postgres/src/db/query_sql.ts",
+  "examples/bun-postgres/src/db/query_sql.ts",
+].map((path) => resolve(root, path));
+export const batchUsageFile = resolve(root, "test-support/pg-batch-usage.ts");
+export const pgUnsupportedBatchUsageFile = resolve(
+  root,
+  "test-support/pg-unsupported-batch-usage.ts"
+);
+export const transactionUsageFile = resolve(
+  root,
+  "test-support/postgres-transaction-usage.ts"
+);
+export const pgDriverTemplateFile = resolve(root, "src/drivers/pg.ts");
+export const postgresDriverTemplateFile = resolve(root, "src/drivers/postgres.ts");
 
 const tsc = resolve(root, "node_modules/.bin/tsc");
+const nodeRequire = createRequire(import.meta.url);
 
 export function relativePath(path) {
   return relative(root, path);
+}
+
+export function loadGeneratedModule(generatedFile, requireMap = {}, footer = "") {
+  const source = readFileSync(generatedFile, "utf8") + footer;
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true,
+    },
+  });
+  const module = { exports: {} };
+  const context = createContext({
+    module,
+    exports: module.exports,
+    Date,
+    Error,
+    TypeError,
+    require: (specifier) => {
+      if (Object.prototype.hasOwnProperty.call(requireMap, specifier)) {
+        return requireMap[specifier];
+      }
+      if (specifier.startsWith("node:")) {
+        return nodeRequire(specifier);
+      }
+      throw new Error(`Unexpected require: ${specifier}`);
+    },
+  });
+  new Script(outputText, { filename: generatedFile }).runInContext(context);
+  return module.exports;
+}
+
+export function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+export async function flushAsync() {
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 export function assertTypeChecks(label, files) {
