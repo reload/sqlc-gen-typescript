@@ -4,15 +4,17 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "tsc --noEmit && node --test"
+    "test": "tsc --noEmit && vitest run test/*.test.mjs"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "@types/pg": "^8.10.9",
     "esbuild": "^0.28.1",
     "postgres": "^3.4.9",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.1",
