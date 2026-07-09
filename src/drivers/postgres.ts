@@ -17,10 +17,10 @@ function funcParamsDecl(iface: string | undefined, params: Parameter[]) {
       undefined,
       factory.createIdentifier("sql"),
       undefined,
-      factory.createTypeReferenceNode(
-        factory.createIdentifier("Sql"),
-        undefined
-      ),
+      factory.createUnionTypeNode([
+        factory.createTypeReferenceNode(factory.createIdentifier("Sql"), undefined),
+        factory.createTypeReferenceNode(factory.createIdentifier("TransactionSql"), undefined),
+      ]),
       undefined
     ),
   ];
@@ -303,13 +303,18 @@ export class Driver {
       factory.createImportDeclaration(
         undefined,
         factory.createImportClause(
-          false,
+          true,
           undefined,
           factory.createNamedImports([
             factory.createImportSpecifier(
               false,
               undefined,
               factory.createIdentifier("Sql")
+            ),
+            factory.createImportSpecifier(
+              false,
+              undefined,
+              factory.createIdentifier("TransactionSql")
             ),
           ])
         ),
