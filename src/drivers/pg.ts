@@ -5,6 +5,9 @@ import {
   TypeNode,
   factory,
   FunctionDeclaration,
+  createSourceFile,
+  ScriptKind,
+  ScriptTarget,
 } from "typescript";
 
 import { Column, Parameter, Query } from "../gen/plugin/codegen_pb";
@@ -42,6 +45,72 @@ function funcParamsDecl(iface: string | undefined, params: Parameter[]) {
   }
 
   return funcParams;
+}
+
+function sourceStatements(source: string): Node[] {
+  return Array.from(
+    createSourceFile(
+      "batch.ts",
+      source,
+      ScriptTarget.Latest,
+      false,
+      ScriptKind.TS
+    ).statements
+  );
+}
+
+function batchFuncParamsDecl(argIface: string | undefined): string {
+  return `_client: Client, _args: ${(argIface ?? "void")}[], _options?: SqlcBatchOptions`;
+}
+
+function copyfromFuncParamsDecl(argIface: string | undefined): string {
+  return `_client: Client, _args: ${(argIface ?? "void")}[]`;
+}
+
+function batchUnsupportedDecls(): Node[] {
+  return sourceStatements(`
+/**
+ * Accepted by pg batch stubs for source compatibility only.
+ * node-postgres batch annotations always throw SqlcBatchUnsupportedError.
+ */
+export interface SqlcBatchOptions {
+    batchSize?: number;
+}
+
+/**
+ * node-postgres does not expose pgx-style SendBatch/pipelining semantics.
+ * Use the postgres driver for generated batch query support.
+ */
+export class SqlcBatchUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(\`pg driver does not support \${command}; use the postgres driver for batch annotations.\`);
+        this.name = "SqlcBatchUnsupportedError";
+        this.command = command;
+    }
+}
+`);
+}
+
+function copyfromUnsupportedDecls(): Node[] {
+  return sourceStatements(`
+/**
+ * node-postgres needs external COPY stream wiring that this generator does not emit.
+ * Use the postgres driver for generated :copyfrom support.
+ */
+export class SqlcCopyFromUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(\`pg driver does not support \${command}; use the postgres driver for :copyfrom annotations.\`);
+        this.name = "SqlcCopyFromUnsupportedError";
+        this.command = command;
+    }
+}
+`);
 }
 
 export class Driver {
@@ -428,6 +497,14 @@ export class Driver {
       )
     );
 
+    if (queries.some((query) => query.cmd.startsWith(":batch"))) {
+      imports.push(...batchUnsupportedDecls());
+    }
+
+    if (queries.some((query) => query.cmd === ":copyfrom")) {
+      imports.push(...copyfromUnsupportedDecls());
+    }
+
     return imports;
   }
 
@@ -795,6 +872,79 @@ export class Driver {
         true
       )
     );
+  }
+
+  batchexecDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    resultIface: string,
+    params: Parameter[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    throw new SqlcBatchUnsupportedError(":batchexec");
+}
+`);
+  }
+
+  batchmanyDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+    rows: ${returnIface}[];
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    throw new SqlcBatchUnsupportedError(":batchmany");
+}
+`);
+  }
+
+  batchoneDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    return sourceStatements(`
+export interface ${resultIface} {
+    index: number;
+    row: ${returnIface} | null;
+}
+
+export async function ${funcName}(${batchFuncParamsDecl(argIface)}): Promise<${resultIface}[]> {
+    throw new SqlcBatchUnsupportedError(":batchone");
+}
+`);
+  }
+
+  copyfromDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    params: Parameter[]
+  ): Node[] {
+    return sourceStatements(`
+export async function ${funcName}(${copyfromFuncParamsDecl(argIface)}): Promise<number> {
+    throw new SqlcCopyFromUnsupportedError(":copyfrom");
+}
+`);
   }
 
   execlastidDecl(

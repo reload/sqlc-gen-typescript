@@ -27,6 +27,7 @@ import {
   File,
   FileSchema,
   Query,
+  Identifier,
 } from "./gen/plugin/codegen_pb";
 
 import { argName, colName } from "./drivers/utlis";
@@ -34,6 +35,7 @@ import { Driver as Sqlite3Driver } from "./drivers/better-sqlite3";
 import { Driver as PgDriver } from "./drivers/pg";
 import { Driver as PostgresDriver } from "./drivers/postgres";
 import { Mysql2Options, Driver as MysqlDriver } from "./drivers/mysql2";
+import { validateCopyfromQuery } from "./copyfrom-validation";
 
 // Read input from stdin
 const input = readInput();
@@ -79,6 +81,38 @@ interface Driver {
     params: Parameter[],
     columns: Column[]
   ) => Node;
+  batchexecDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    resultIface: string,
+    params: Parameter[]
+  ) => Node[];
+  batchmanyDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ) => Node[];
+  batchoneDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ) => Node[];
+  copyfromDecl: (
+    name: string,
+    text: string,
+    argIface: string | undefined,
+    params: Parameter[],
+    table: Identifier | undefined
+  ) => Node[];
 }
 
 function createNodeGenerator(options: Options): Driver {
@@ -195,6 +229,59 @@ ${query.text}`
               returnIface ?? "void",
               query.params,
               query.columns
+            )
+          );
+          break;
+        }
+        case ":batchexec": {
+          nodes.push(
+            ...driver.batchexecDecl(
+              lowerName,
+              textName,
+              argIface,
+              `${query.name}BatchResult`,
+              query.params
+            )
+          );
+          break;
+        }
+        case ":batchmany": {
+          nodes.push(
+            ...driver.batchmanyDecl(
+              lowerName,
+              textName,
+              argIface,
+              returnIface ?? "void",
+              `${query.name}BatchResult`,
+              query.params,
+              query.columns
+            )
+          );
+          break;
+        }
+        case ":batchone": {
+          nodes.push(
+            ...driver.batchoneDecl(
+              lowerName,
+              textName,
+              argIface,
+              returnIface ?? "void",
+              `${query.name}BatchResult`,
+              query.params,
+              query.columns
+            )
+          );
+          break;
+        }
+        case ":copyfrom": {
+          validateCopyfromQuery(query);
+          nodes.push(
+            ...driver.copyfromDecl(
+              lowerName,
+              textName,
+              argIface,
+              query.params,
+              query.insertIntoTable
             )
           );
           break;

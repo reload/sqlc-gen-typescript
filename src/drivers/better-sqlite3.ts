@@ -425,6 +425,49 @@ export class Driver {
     );
   }
 
+  batchexecDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    resultIface: string,
+    params: Parameter[]
+  ): Node[] {
+    throw new Error("better-sqlite3 driver currently does not support :batchexec");
+  }
+
+  batchmanyDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    throw new Error("better-sqlite3 driver currently does not support :batchmany");
+  }
+
+  batchoneDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    throw new Error("better-sqlite3 driver currently does not support :batchone");
+  }
+
+  copyfromDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    params: Parameter[]
+  ): Node[] {
+    throw new Error("better-sqlite3 driver currently does not support :copyfrom");
+  }
+
   execlastidDecl(
     funcName: string,
     queryName: string,

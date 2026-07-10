@@ -1,4 +1,4 @@
-import { NodeFlags, SyntaxKind, TypeNode, factory } from "typescript";
+import { Node, NodeFlags, SyntaxKind, TypeNode, factory } from "typescript";
 
 // import { writeFileSync, STDIO } from "javy/fs";
 
@@ -656,6 +656,49 @@ export class Driver {
         true
       )
     );
+  }
+
+  batchexecDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    resultIface: string,
+    params: Parameter[]
+  ): Node[] {
+    throw new Error("mysql2 driver currently does not support :batchexec");
+  }
+
+  batchmanyDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    throw new Error("mysql2 driver currently does not support :batchmany");
+  }
+
+  batchoneDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    returnIface: string,
+    resultIface: string,
+    params: Parameter[],
+    columns: Column[]
+  ): Node[] {
+    throw new Error("mysql2 driver currently does not support :batchone");
+  }
+
+  copyfromDecl(
+    funcName: string,
+    queryName: string,
+    argIface: string | undefined,
+    params: Parameter[]
+  ): Node[] {
+    throw new Error("mysql2 driver currently does not support :copyfrom");
   }
 
   execlastidDecl(

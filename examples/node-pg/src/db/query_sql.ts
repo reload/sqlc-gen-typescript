@@ -6,6 +6,43 @@ interface Client {
     query: (config: QueryArrayConfig) => Promise<QueryArrayResult>;
 }
 
+/**
+ * Accepted by pg batch stubs for source compatibility only.
+ * node-postgres batch annotations always throw SqlcBatchUnsupportedError.
+ */
+export interface SqlcBatchOptions {
+    batchSize?: number;
+}
+
+/**
+ * node-postgres does not expose pgx-style SendBatch/pipelining semantics.
+ * Use the postgres driver for generated batch query support.
+ */
+export class SqlcBatchUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(`pg driver does not support ${command}; use the postgres driver for batch annotations.`);
+        this.name = "SqlcBatchUnsupportedError";
+        this.command = command;
+    }
+}
+
+/**
+ * node-postgres needs external COPY stream wiring that this generator does not emit.
+ * Use the postgres driver for generated :copyfrom support.
+ */
+export class SqlcCopyFromUnsupportedError extends Error {
+    readonly driver = "pg";
+    readonly command: string;
+
+    constructor(command: string) {
+        super(`pg driver does not support ${command}; use the postgres driver for :copyfrom annotations.`);
+        this.name = "SqlcCopyFromUnsupportedError";
+        this.command = command;
+    }
+}
 export const getAuthorQuery = `-- name: GetAuthor :one
 SELECT id, name, bio FROM authors
 WHERE id = $1 LIMIT 1`;
@@ -104,6 +141,22 @@ export async function createAuthor(client: Client, args: CreateAuthorArgs): Prom
     };
 }
 
+export const copyAuthorsQuery = `-- name: CopyAuthors :copyfrom
+INSERT INTO authors (
+  name, bio
+) VALUES (
+  $1, $2
+)`;
+
+export interface CopyAuthorsArgs {
+    name: string;
+    bio: string | null;
+}
+
+export async function copyAuthors(_client: Client, _args: CopyAuthorsArgs[]): Promise<number> {
+    throw new SqlcCopyFromUnsupportedError(":copyfrom");
+}
+
 export const deleteAuthorQuery = `-- name: DeleteAuthor :exec
 DELETE FROM authors
 WHERE id = $1`;
@@ -118,5 +171,73 @@ export async function deleteAuthor(client: Client, args: DeleteAuthorArgs): Prom
         values: [args.id],
         rowMode: "array"
     });
+}
+
+export const batchCreateAuthorQuery = `-- name: BatchCreateAuthor :batchone
+INSERT INTO authors (
+  name, bio
+) VALUES (
+  $1, $2
+)
+RETURNING id, name, bio`;
+
+export interface BatchCreateAuthorArgs {
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchCreateAuthorRow {
+    id: string;
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchCreateAuthorBatchResult {
+    index: number;
+    row: BatchCreateAuthorRow | null;
+}
+
+export async function batchCreateAuthor(_client: Client, _args: BatchCreateAuthorArgs[], _options?: SqlcBatchOptions): Promise<BatchCreateAuthorBatchResult[]> {
+    throw new SqlcBatchUnsupportedError(":batchone");
+}
+
+export const batchListAuthorsByBioQuery = `-- name: BatchListAuthorsByBio :batchmany
+SELECT id, name, bio FROM authors
+WHERE bio = $1
+ORDER BY name`;
+
+export interface BatchListAuthorsByBioArgs {
+    bio: string | null;
+}
+
+export interface BatchListAuthorsByBioRow {
+    id: string;
+    name: string;
+    bio: string | null;
+}
+
+export interface BatchListAuthorsByBioBatchResult {
+    index: number;
+    rows: BatchListAuthorsByBioRow[];
+}
+
+export async function batchListAuthorsByBio(_client: Client, _args: BatchListAuthorsByBioArgs[], _options?: SqlcBatchOptions): Promise<BatchListAuthorsByBioBatchResult[]> {
+    throw new SqlcBatchUnsupportedError(":batchmany");
+}
+
+export const batchDeleteAuthorQuery = `-- name: BatchDeleteAuthor :batchexec
+DELETE FROM authors
+WHERE id = $1`;
+
+export interface BatchDeleteAuthorArgs {
+    id: string;
+}
+
+export interface BatchDeleteAuthorBatchResult {
+    index: number;
+}
+
+export async function batchDeleteAuthor(_client: Client, _args: BatchDeleteAuthorArgs[], _options?: SqlcBatchOptions): Promise<BatchDeleteAuthorBatchResult[]> {
+    throw new SqlcBatchUnsupportedError(":batchexec");
 }
 

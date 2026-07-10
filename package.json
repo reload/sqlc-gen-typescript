@@ -4,14 +4,19 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "tsc --noEmit && node --test"
+    "test": "tsc --noEmit && vitest run test/*.test.mjs",
+    "test:integration": "vitest run test/integration",
+    "test:perf": "SQLC_PERF=1 vitest run --reporter=verbose test/perf"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "@types/pg": "^8.10.9",
     "esbuild": "^0.28.1",
-    "typescript": "^6.0.3"
+    "postgres": "^3.4.9",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.1",
