@@ -12,7 +12,7 @@ jobs:
     - uses: sqlc-dev/setup-sqlc@v5
       with:
         sqlc-version: '1.24.0'
-    - uses: actions/setup-node@v6
+    - uses: actions/setup-node@v7
     - name: Build
       run: |
         make generate
