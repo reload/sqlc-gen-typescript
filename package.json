@@ -14,7 +14,7 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.13.0",
+    "@bufbuild/protobuf": "^2.14.0",
     "javy": "^0.1.2",
     "pg": "^8.22.0"
   }
