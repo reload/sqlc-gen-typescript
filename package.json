@@ -16,6 +16,6 @@
   "dependencies": {
     "@bufbuild/protobuf": "^2.16.0",
     "javy": "^0.1.2",
-    "pg": "^8.23.0"
+    "pg": "^8.23.1"
   }
 }
